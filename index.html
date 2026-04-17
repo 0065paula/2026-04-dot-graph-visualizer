@@ -8,12 +8,35 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .node-active { stroke: #3b82f6 !important; stroke-width: 4px !important; }
-        .node-linking { stroke: #f59e0b !important; stroke-width: 4px !important; stroke-dasharray: 4; animation: dash 1s linear infinite; }
+        .node-rect {
+            transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+        }
+        /* Hover：未选中、非连线预选时显示悬停环 */
+        .node-rect.node-hover:not(.node-active):not(.node-linking) {
+            stroke: #3b82f6 !important;
+            stroke-width: 2.75px !important;
+            filter: drop-shadow(0 2px 8px rgba(37, 99, 235, 0.2));
+        }
+        /* 当前选中（编辑中） */
+        .node-rect.node-active {
+            stroke: #2563eb !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 0 2px rgba(37, 99, 235, 0.35)) drop-shadow(0 4px 12px rgba(37, 99, 235, 0.2));
+        }
+        /* 连线模式下的起点预选 */
+        .node-rect.node-linking {
+            stroke: #f59e0b !important;
+            stroke-width: 4px !important;
+            stroke-dasharray: 5 4;
+            animation: dash 1s linear infinite;
+            filter: drop-shadow(0 0 0 2px rgba(245, 158, 11, 0.35));
+        }
         @keyframes dash { to { stroke-dashoffset: -8; } }
         .canvas-container { background-color: #f0fdf4; background-image: radial-gradient(#dcfce7 1px, transparent 1px); background-size: 20px 20px; }
+        .canvas-container.link-mode-canvas { cursor: crosshair; }
         svg { cursor: grab; }
         svg:active { cursor: grabbing; }
+        .canvas-container.link-mode-canvas svg { cursor: crosshair; }
         .transition-all { transition: all 0.2s ease; }
     </style>
 </head>
@@ -24,7 +47,9 @@
             <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-white font-bold">S</div>
             <h1 class="text-xl font-bold text-gray-800">业务策略架构图</h1>
         </div>
-        <div class="flex gap-3">
+        <div class="flex gap-2 flex-wrap items-center justify-end">
+            <input type="file" id="import-json-input" accept=".json,application/json" class="hidden" aria-hidden="true">
+            <button type="button" onclick="document.getElementById('import-json-input').click()" class="px-4 py-2 border rounded hover:bg-gray-50 text-sm">导入数据</button>
             <button onclick="exportJSON()" class="px-4 py-2 border rounded hover:bg-gray-50 text-sm">导出数据</button>
             <button onclick="downloadSVG()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow-sm transition-colors">下载 SVG</button>
         </div>
@@ -38,6 +63,17 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     添加节点类型
                 </h3>
+                <div class="mb-4 p-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/80 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-semibold text-gray-700">连线</span>
+                        <button type="button" id="btn-link-mode" onclick="toggleLinkMode()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-100">
+                            连线模式：关
+                        </button>
+                    </div>
+                    <p id="link-mode-hint" class="text-[11px] text-gray-500 leading-relaxed hidden">
+                        开启后：依次点击起点节点与终点节点即可连线；已存在的连线再次连接会删除。关闭本模式时仍可用 <kbd class="px-1 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-[10px]">Shift</kbd>+点击。
+                    </p>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <button onclick="addNode('main')" class="p-3 border rounded-xl hover:border-green-400 bg-green-50 flex flex-col items-center gap-2 group transition-all">
                         <div class="w-10 h-10 rounded-full bg-white border-2 border-indigo-900 group-hover:scale-110 transition-transform"></div>
@@ -48,6 +84,58 @@
                         <span class="text-xs font-medium text-gray-600">功能/策略</span>
                     </button>
                 </div>
+            </section>
+
+            <!-- 连线样式（默认，新连线使用） -->
+            <section class="p-3 rounded-xl border border-gray-200 bg-white shadow-sm">
+                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    连线默认样式
+                </h3>
+                <p class="text-[11px] text-gray-500 mb-3">新建连线时使用；点击画布上的连线可单独修改。</p>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <label class="text-gray-500 font-medium block mb-1">颜色</label>
+                        <input type="color" id="link-default-stroke" value="#86efac" oninput="updateLinkDefaults('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
+                    </div>
+                    <div>
+                        <label class="text-gray-500 font-medium block mb-1">线宽</label>
+                        <input type="number" id="link-default-width" min="0.5" max="12" step="0.5" value="1.5" oninput="updateLinkDefaults('strokeWidth', this.value)" class="w-full border rounded-lg p-2 border-gray-200">
+                    </div>
+                    <div class="col-span-2">
+                        <div class="flex justify-between mb-1">
+                            <label class="text-gray-500 font-medium">不透明度</label>
+                            <span id="link-default-opacity-val" class="text-green-600 font-mono">0.6</span>
+                        </div>
+                        <input type="range" id="link-default-opacity" min="0.1" max="1" step="0.05" value="0.6" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateLinkDefaults('strokeOpacity', this.value)">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 选中连线编辑 -->
+            <section id="link-editor-panel" class="hidden space-y-3 p-3 rounded-xl border-2 border-amber-200 bg-amber-50/50">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                    编辑选中连线
+                </h3>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <label class="text-gray-600 font-medium block mb-1">颜色</label>
+                        <input type="color" id="link-edit-stroke" oninput="updateActiveLink('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
+                    </div>
+                    <div>
+                        <label class="text-gray-600 font-medium block mb-1">线宽</label>
+                        <input type="number" id="link-edit-width" min="0.5" max="16" step="0.5" oninput="updateActiveLink('strokeWidth', this.value)" class="w-full border rounded-lg p-2 border-gray-200">
+                    </div>
+                    <div class="col-span-2">
+                        <div class="flex justify-between mb-1">
+                            <label class="text-gray-600 font-medium">不透明度</label>
+                            <span id="link-edit-opacity-val" class="text-amber-700 font-mono">0.6</span>
+                        </div>
+                        <input type="range" id="link-edit-opacity" min="0.1" max="1" step="0.05" oninput="updateActiveLink('strokeOpacity', this.value)" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    </div>
+                </div>
+                <button type="button" onclick="deleteActiveLink()" class="w-full py-2 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-medium hover:bg-red-50">删除此连线</button>
             </section>
 
             <!-- 选定元素编辑区 -->
@@ -61,16 +149,25 @@
                         <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">文字内容 (空格换行)</label>
                         <textarea id="node-text" oninput="updateActiveNode()" class="w-full border rounded-lg p-3 text-sm h-20 focus:ring-2 focus:ring-green-200 outline-none transition-all border-gray-200"></textarea>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">自定义半径</label>
                             <input type="number" id="node-radius" oninput="updateActiveNode()" class="w-full border rounded-lg p-2 text-sm border-gray-200">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">自定义填充色</label>
+                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">字号 (px)</label>
+                            <input type="number" id="node-font-size" min="8" max="48" step="1" oninput="updateActiveNode()" class="w-full border rounded-lg p-2 text-sm border-gray-200" title="留空则使用类别默认字号">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">描边色</label>
+                            <input type="color" id="node-stroke" oninput="updateActiveNode()" class="w-full h-9 border rounded-lg overflow-hidden cursor-pointer border-gray-200">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">填充色</label>
                             <input type="color" id="node-color" oninput="updateActiveNode()" class="w-full h-9 border rounded-lg overflow-hidden cursor-pointer border-gray-200">
                         </div>
                     </div>
+                    <p class="text-[11px] text-gray-400">字号留空表示沿用类别默认；描边/填充与类别相同时可在「恢复默认」中清除覆盖。</p>
                     <div class="flex gap-2">
                         <button onclick="resetNodeStyle()" class="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">恢复默认</button>
                         <button onclick="deleteActiveElement()" class="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors">删除节点</button>
@@ -90,21 +187,21 @@
                             <label class="text-gray-500 font-medium">离散引力 (间距)</label>
                             <span id="val-charge" class="text-green-600 font-mono">-500</span>
                         </div>
-                        <input type="range" min="-2000" max="-100" value="-500" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('charge', this.value)">
+                        <input type="range" id="sim-charge" min="-2000" max="-100" value="-500" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('charge', this.value)">
                     </div>
                     <div>
                         <div class="flex justify-between mb-1 text-xs">
                             <label class="text-gray-500 font-medium">连线强度 (拉扯)</label>
                             <span id="val-link" class="text-green-600 font-mono">0.08</span>
                         </div>
-                        <input type="range" min="0" max="0.5" step="0.01" value="0.08" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('link', this.value)">
+                        <input type="range" id="sim-link" min="0" max="0.5" step="0.01" value="0.08" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('link', this.value)">
                     </div>
                     <div>
                         <div class="flex justify-between mb-1 text-xs">
                             <label class="text-gray-500 font-medium">碰撞半径 (防火墙)</label>
                             <span id="val-collide" class="text-green-600 font-mono">25</span>
                         </div>
-                        <input type="range" min="0" max="100" value="25" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('collide', this.value)">
+                        <input type="range" id="sim-collide" min="0" max="100" value="25" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('collide', this.value)">
                     </div>
                 </div>
             </section>
@@ -119,23 +216,39 @@
                     <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
                         <p class="font-bold text-indigo-900 mb-2">核心目标 (Main)</p>
                         <div class="flex items-center justify-between mb-2">
-                            <span>主色调</span>
-                            <input type="color" value="#1e3a8a" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
+                            <span>描边</span>
+                            <input type="color" id="cat-main-stroke" value="#1e3a8a" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>填充</span>
+                            <input type="color" id="cat-main-fill" value="#ffffff" oninput="updateCategoryConfig('main', 'fill', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>基准半径</span>
+                            <input type="number" id="cat-main-r" value="75" oninput="updateCategoryConfig('main', 'r', this.value)" class="w-12 border p-1 rounded">
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>基准半径</span>
-                            <input type="number" value="75" oninput="updateCategoryConfig('main', 'r', this.value)" class="w-12 border p-1 rounded">
+                            <span>字号 (px)</span>
+                            <input type="number" id="cat-main-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('main', 'fontSize', this.value)" class="w-12 border p-1 rounded">
                         </div>
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
                         <p class="font-bold text-green-700 mb-2">功能/策略 (Sub)</p>
                         <div class="flex items-center justify-between mb-2">
-                            <span>主色调</span>
-                            <input type="color" value="#10b981" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
+                            <span>描边</span>
+                            <input type="color" id="cat-sub-stroke" value="#10b981" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>填充</span>
+                            <input type="color" id="cat-sub-fill" value="#ffffff" oninput="updateCategoryConfig('sub', 'fill', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>基准半径</span>
+                            <input type="number" id="cat-sub-r" value="45" oninput="updateCategoryConfig('sub', 'r', this.value)" class="w-12 border p-1 rounded">
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>基准半径</span>
-                            <input type="number" value="45" oninput="updateCategoryConfig('sub', 'r', this.value)" class="w-12 border p-1 rounded">
+                            <span>字号 (px)</span>
+                            <input type="number" id="cat-sub-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('sub', 'fontSize', this.value)" class="w-12 border p-1 rounded">
                         </div>
                     </div>
                 </div>
@@ -155,9 +268,27 @@
     <script>
         // 全局类别配置
         const categoryConfig = {
-            main: { r: 75, stroke: "#1e3a8a", fill: "#ffffff", strokeWidth: 3 },
-            sub: { r: 45, stroke: "#10b981", fill: "#ffffff", strokeWidth: 1.5 }
+            main: { r: 75, stroke: "#1e3a8a", fill: "#ffffff", strokeWidth: 3, fontSize: 12 },
+            sub: { r: 45, stroke: "#10b981", fill: "#ffffff", strokeWidth: 1.5, fontSize: 12 }
         };
+
+        function clampFontSize(px) {
+            const n = Number(px);
+            if (!Number.isFinite(n)) return 12;
+            return Math.min(48, Math.max(8, Math.round(n * 10) / 10));
+        }
+
+        /** 节点最终字号：单节点覆盖 > 类别默认 */
+        function effectiveNodeFontSize(d) {
+            const def = categoryConfig[d.type].fontSize;
+            const base = def != null && def > 0 ? clampFontSize(def) : 12;
+            if (d.fontSize != null && Number.isFinite(d.fontSize)) return clampFontSize(d.fontSize);
+            return base;
+        }
+
+        function measureFontString(px) {
+            return `500 ${px}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+        }
 
         // 布局引擎参数
         let simulationParams = {
@@ -165,6 +296,15 @@
             link: 0.08,
             collidePadding: 25
         };
+
+        /** 新建连线默认样式（可导出） */
+        let linkDefaults = {
+            stroke: "#86efac",
+            strokeOpacity: 0.6,
+            strokeWidth: 1.5
+        };
+
+        let activeLink = null;
 
         // 初始数据（按示意图填充）
         let nodes = [
@@ -204,37 +344,133 @@
 
         let activeNode = null;
         let linkingNode = null;
+        /** 连线模式：点击两点连线；关闭后仍可用 Shift+点击 */
+        let linkMode = false;
+        /** 悬停节点 id（用于 hover 样式，与选中区分） */
+        let hoveredNodeId = null;
+
         const svg = d3.select("#main-svg");
         const container = svg.append("g");
         const zoom = d3.zoom().scaleExtent([0.1, 5]).on("zoom", (e) => container.attr("transform", e.transform));
         svg.call(zoom);
 
+        const _measureCanvas = document.createElement("canvas");
+        const _measureCtx = _measureCanvas.getContext("2d");
+
+        function splitTextLines(text) {
+            const raw = (text || "").split(/\s+/).filter(Boolean);
+            const lines = raw.flatMap(s => s.match(/.{1,9}/g) || []);
+            return lines.length ? lines : [""];
+        }
+
+        /**
+         * 按文字内容计算节点宽高与碰撞半径；写入 d.layoutW / d.layoutH / d.collideR
+         */
+        function computeNodeLayout(d) {
+            const conf = categoryConfig[d.type];
+            const isMain = d.type === "main";
+            const fs = effectiveNodeFontSize(d);
+            const padX = Math.round(10 + fs * 0.35);
+            const padY = Math.round(8 + fs * 0.2);
+            const lineHeightPx = fs * 1.2;
+            const lines = splitTextLines(d.text);
+            _measureCtx.font = measureFontString(fs);
+            let maxLineW = 0;
+            lines.forEach(line => {
+                const w = _measureCtx.measureText(line).width;
+                if (w > maxLineW) maxLineW = w;
+            });
+            const baseR = d.r_override != null && !Number.isNaN(d.r_override) ? d.r_override : conf.r;
+            const minByType = isMain ? baseR * 2 : baseR * 2.2;
+            let width = Math.max(maxLineW + padX * 2, minByType);
+            let height = Math.max(lines.length * lineHeightPx + padY * 2, isMain ? width : baseR * 1.3);
+            if (isMain) {
+                const side = Math.max(width, height, baseR * 2);
+                width = side;
+                height = side;
+            }
+            d.layoutW = width;
+            d.layoutH = height;
+            d.collideR = Math.hypot(width / 2, height / 2) + simulationParams.collidePadding;
+            return d;
+        }
+
+        function linkPreferredDistance(link) {
+            const s = link.source;
+            const t = link.target;
+            if (!s || !t || s.layoutW == null) return 200;
+            const rs = Math.hypot(s.layoutW / 2, s.layoutH / 2);
+            const rt = Math.hypot(t.layoutW / 2, t.layoutH / 2);
+            return Math.min(420, 90 + rs + rt + 40);
+        }
+
+        function viewportCenter() {
+            const el = document.getElementById("canvas-wrapper");
+            const w = el ? el.clientWidth : window.innerWidth;
+            const h = el ? el.clientHeight : window.innerHeight;
+            return { x: w / 2, y: h / 2 };
+        }
+
         function zoomAdjust(factor) {
             svg.transition().duration(300).call(zoom.scaleBy, factor);
         }
 
+        nodes.forEach(computeNodeLayout);
+
+        const cx = viewportCenter();
         let simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(220).strength(simulationParams.link))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(linkPreferredDistance).strength(simulationParams.link))
             .force("charge", d3.forceManyBody().strength(simulationParams.charge))
-            .force("center", d3.forceCenter(window.innerWidth / 2 - 100, window.innerHeight / 2))
-            .force("collide", d3.forceCollide().radius(d => (d.r_override || categoryConfig[d.type].r) + simulationParams.collidePadding))
+            .force("center", d3.forceCenter(cx.x, cx.y))
+            .force("x", d3.forceX(cx.x).strength(0.06))
+            .force("y", d3.forceY(cx.y).strength(0.06))
+            .force("collide", d3.forceCollide().radius(d => d.collideR != null ? d.collideR : (d.r_override || categoryConfig[d.type].r) + simulationParams.collidePadding))
             .on("tick", ticked);
 
-        let linkElements = container.append("g").attr("class", "links").selectAll("line");
+        let linkGroups = container.append("g").attr("class", "links").selectAll("g.link-group");
         let nodeElements = container.append("g").attr("class", "nodes").selectAll(".node-group");
 
-        function render() {
-            linkElements = linkElements.data(links, d => {
-                const s = typeof d.source === 'object' ? d.source.id : d.source;
-                const t = typeof d.target === 'object' ? d.target.id : d.target;
-                return `${Math.min(s, t)}-${Math.max(s, t)}`;
+        function refreshNodeHoverStyles() {
+            nodeElements.each(function(d) {
+                d3.select(this).select("rect").classed("node-hover", hoveredNodeId === d.id);
             });
-            linkElements.exit().remove();
-            linkElements = linkElements.enter().append("line")
-                .attr("stroke", "#86efac")
-                .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", 1.5)
-                .merge(linkElements);
+        }
+
+        function linkKey(d) {
+            const s = typeof d.source === "object" ? d.source.id : d.source;
+            const t = typeof d.target === "object" ? d.target.id : d.target;
+            return `${Math.min(s, t)}-${Math.max(s, t)}`;
+        }
+
+        function render() {
+            linkGroups = linkGroups.data(links, linkKey);
+            linkGroups.exit().remove();
+            const linkEnter = linkGroups.enter().append("g")
+                .attr("class", "link-group")
+                .style("cursor", "pointer");
+            linkEnter.append("line")
+                .attr("class", "link-hit")
+                .attr("stroke", "transparent")
+                .attr("stroke-width", 16)
+                .attr("pointer-events", "all")
+                .on("click", handleLinkClick);
+            linkEnter.append("line")
+                .attr("class", "link-line")
+                .attr("pointer-events", "none")
+                .attr("stroke-linecap", "round");
+            linkGroups = linkEnter.merge(linkGroups);
+
+            linkGroups.each(function(d) {
+                const stroke = d.stroke || linkDefaults.stroke;
+                const op = d.strokeOpacity != null ? d.strokeOpacity : linkDefaults.strokeOpacity;
+                const sw = d.strokeWidth != null ? d.strokeWidth : linkDefaults.strokeWidth;
+                const isSel = activeLink === d;
+                d3.select(this).select(".link-line")
+                    .attr("stroke", stroke)
+                    .attr("stroke-opacity", isSel ? Math.min(1, op + 0.15) : op)
+                    .attr("stroke-width", isSel ? sw + 2.5 : sw)
+                    .attr("stroke-dasharray", isSel ? "8 5" : "none");
+            });
 
             nodeElements = nodeElements.data(nodes, d => d.id);
             nodeElements.exit().remove();
@@ -247,29 +483,38 @@
                     .on("end", dragended))
                 .on("click", handleNodeClick);
 
-            nodeEnter.append("rect")
-                .attr("class", "node-rect transition-all cursor-pointer shadow-sm");
+            nodeEnter.append("rect").attr("class", "node-rect");
 
             nodeEnter.append("text")
                 .attr("text-anchor", "middle")
                 .attr("dominant-baseline", "middle")
-                .attr("class", "pointer-events-none select-none text-[12px] font-medium");
+                .attr("class", "pointer-events-none select-none font-medium");
 
             nodeElements = nodeEnter.merge(nodeElements);
 
+            nodeElements
+                .on("mouseenter", function(ev, d) {
+                    hoveredNodeId = d.id;
+                    refreshNodeHoverStyles();
+                })
+                .on("mouseleave", function(ev, d) {
+                    if (hoveredNodeId === d.id) hoveredNodeId = null;
+                    refreshNodeHoverStyles();
+                });
+
             nodeElements.each(function(d) {
                 const conf = categoryConfig[d.type];
-                const r = d.r_override || conf.r;
+                computeNodeLayout(d);
                 const stroke = d.stroke_override || conf.stroke;
                 const fill = d.fill_override || conf.fill;
-                
+
                 const group = d3.select(this);
                 const rect = group.select("rect");
                 const text = group.select("text");
 
-                const isMain = d.type === 'main';
-                const width = r * 2.2;
-                const height = isMain ? width : r * 1.3;
+                const isMain = d.type === "main";
+                const width = d.layoutW;
+                const height = d.layoutH;
                 const rx = isMain ? width / 2 : 8;
 
                 rect.attr("width", width)
@@ -280,13 +525,21 @@
                     .attr("fill", fill)
                     .attr("stroke", stroke)
                     .attr("stroke-width", isMain ? 3 : 1.5)
-                    .attr("class", (activeNode && d.id === activeNode.id) ? "node-active" : 
-                                   (linkingNode && d.id === linkingNode.id) ? "node-linking" : "");
+                    .attr("class", "node-rect")
+                    .classed("transition-all", true)
+                    .classed("cursor-pointer", true)
+                    .classed("shadow-sm", true)
+                    .classed("node-active", !!(activeNode && d.id === activeNode.id))
+                    .classed("node-linking", !!(linkingNode && d.id === linkingNode.id))
+                    .classed("node-hover", hoveredNodeId === d.id);
 
-                text.attr("fill", stroke);
+                const fs = effectiveNodeFontSize(d);
+                text.attr("fill", stroke)
+                    .attr("font-size", fs)
+                    .attr("font-weight", "500");
 
                 text.selectAll("tspan").remove();
-                const lines = d.text.split(" ").flatMap(s => s.match(/.{1,9}/g) || []);
+                const lines = splitTextLines(d.text);
                 lines.forEach((line, i) => {
                     text.append("tspan")
                         .attr("x", 0)
@@ -297,19 +550,196 @@
 
             simulation.nodes(nodes);
             simulation.force("link").links(links);
-            simulation.force("collide").radius(d => (d.r_override || categoryConfig[d.type].r) + simulationParams.collidePadding);
+            simulation.force("link").distance(linkPreferredDistance);
+            simulation.force("collide").radius(d => d.collideR);
+            const c = viewportCenter();
+            simulation.force("center").x(c.x).y(c.y);
+            simulation.force("x").x(c.x);
+            simulation.force("y").y(c.y);
             simulation.alpha(0.1).restart();
         }
 
         function ticked() {
-            linkElements.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-                        .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            linkGroups.each(function(d) {
+                const x1 = d.source.x, y1 = d.source.y, x2 = d.target.x, y2 = d.target.y;
+                const g = d3.select(this);
+                g.select(".link-hit").attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2);
+                g.select(".link-line").attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2);
+            });
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+        }
+
+        function syncCategoryInputsFromConfig() {
+            document.getElementById("cat-main-stroke").value = categoryConfig.main.stroke;
+            document.getElementById("cat-main-fill").value = categoryConfig.main.fill;
+            document.getElementById("cat-main-r").value = categoryConfig.main.r;
+            document.getElementById("cat-main-font").value = categoryConfig.main.fontSize != null ? categoryConfig.main.fontSize : 12;
+            document.getElementById("cat-sub-stroke").value = categoryConfig.sub.stroke;
+            document.getElementById("cat-sub-fill").value = categoryConfig.sub.fill;
+            document.getElementById("cat-sub-r").value = categoryConfig.sub.r;
+            document.getElementById("cat-sub-font").value = categoryConfig.sub.fontSize != null ? categoryConfig.sub.fontSize : 12;
+        }
+
+        function syncSimulationInputsFromParams() {
+            document.getElementById("sim-charge").value = String(simulationParams.charge);
+            document.getElementById("val-charge").textContent = String(simulationParams.charge);
+            document.getElementById("sim-link").value = String(simulationParams.link);
+            document.getElementById("val-link").textContent = String(simulationParams.link);
+            document.getElementById("sim-collide").value = String(simulationParams.collidePadding);
+            document.getElementById("val-collide").textContent = String(simulationParams.collidePadding);
+            simulation.force("charge").strength(simulationParams.charge);
+            simulation.force("link").strength(simulationParams.link);
+        }
+
+        function syncLinkDefaultInputs() {
+            document.getElementById("link-default-stroke").value = linkDefaults.stroke;
+            document.getElementById("link-default-width").value = String(linkDefaults.strokeWidth);
+            document.getElementById("link-default-opacity").value = String(linkDefaults.strokeOpacity);
+            document.getElementById("link-default-opacity-val").textContent = String(linkDefaults.strokeOpacity);
+        }
+
+        function fillLinkEditPanel(d) {
+            document.getElementById("link-edit-stroke").value = d.stroke || linkDefaults.stroke;
+            const sw = d.strokeWidth != null ? d.strokeWidth : linkDefaults.strokeWidth;
+            document.getElementById("link-edit-width").value = String(sw);
+            const op = d.strokeOpacity != null ? d.strokeOpacity : linkDefaults.strokeOpacity;
+            document.getElementById("link-edit-opacity").value = String(op);
+            document.getElementById("link-edit-opacity-val").textContent = String(op);
+        }
+
+        function updateLinkDefaults(prop, value) {
+            if (prop === "strokeWidth") linkDefaults.strokeWidth = parseFloat(value);
+            else if (prop === "strokeOpacity") {
+                linkDefaults.strokeOpacity = parseFloat(value);
+                document.getElementById("link-default-opacity-val").textContent = value;
+            } else linkDefaults.stroke = value;
+            render();
+        }
+
+        function updateActiveLink(prop, value) {
+            if (!activeLink) return;
+            if (prop === "strokeWidth") activeLink.strokeWidth = parseFloat(value);
+            else if (prop === "strokeOpacity") {
+                activeLink.strokeOpacity = parseFloat(value);
+                document.getElementById("link-edit-opacity-val").textContent = value;
+            } else activeLink.stroke = value;
+            render();
+        }
+
+        function deleteActiveLink() {
+            if (!activeLink) return;
+            links = links.filter(l => l !== activeLink);
+            activeLink = null;
+            document.getElementById("link-editor-panel").classList.add("hidden");
+            render();
+        }
+
+        function handleLinkClick(e, d) {
+            e.stopPropagation();
+            activeNode = null;
+            linkingNode = null;
+            hoveredNodeId = null;
+            activeLink = d;
+            document.getElementById("editor-panel").classList.add("hidden");
+            document.getElementById("link-editor-panel").classList.remove("hidden");
+            fillLinkEditPanel(d);
+            render();
+        }
+
+        function applyImportedData(data) {
+            if (!data || !Array.isArray(data.nodes)) {
+                alert("导入失败：文件需包含 nodes 数组。");
+                return;
+            }
+            if (data.config) {
+                if (data.config.main) Object.assign(categoryConfig.main, data.config.main);
+                if (data.config.sub) Object.assign(categoryConfig.sub, data.config.sub);
+            }
+            if (data.simulationParams) Object.assign(simulationParams, data.simulationParams);
+            if (data.linkDefaults) Object.assign(linkDefaults, data.linkDefaults);
+
+            nodes = data.nodes.map(n => ({
+                id: n.id,
+                text: n.text != null ? n.text : "",
+                type: n.type === "main" ? "main" : "sub",
+                x: n.x,
+                y: n.y,
+                r_override: n.r_override,
+                fill_override: n.fill_override,
+                stroke_override: n.stroke_override,
+                fontSize: n.fontSize != null && Number.isFinite(n.fontSize) ? clampFontSize(n.fontSize) : undefined
+            }));
+
+            const nodeIds = new Set(nodes.map(n => n.id));
+            links = (data.links || []).map(l => ({
+                source: l.source,
+                target: l.target,
+                stroke: l.stroke,
+                strokeOpacity: l.strokeOpacity,
+                strokeWidth: l.strokeWidth
+            })).filter(l => nodeIds.has(l.source) && nodeIds.has(l.target));
+
+            activeNode = null;
+            activeLink = null;
+            linkingNode = null;
+            hoveredNodeId = null;
+            document.getElementById("editor-panel").classList.add("hidden");
+            document.getElementById("link-editor-panel").classList.add("hidden");
+
+            syncCategoryInputsFromConfig();
+            syncSimulationInputsFromParams();
+            syncLinkDefaultInputs();
+
+            const c = viewportCenter();
+            nodes.forEach(n => {
+                if (n.x == null || n.y == null || Number.isNaN(n.x) || Number.isNaN(n.y)) {
+                    n.x = c.x + (Math.random() - 0.5) * 100;
+                    n.y = c.y + (Math.random() - 0.5) * 100;
+                }
+                n.vx = 0;
+                n.vy = 0;
+            });
+
+            nodes.forEach(computeNodeLayout);
+
+            simulation.nodes(nodes);
+            simulation.force("link").links(links);
+            simulation.force("link").distance(linkPreferredDistance);
+            simulation.force("collide").radius(d => d.collideR);
+            simulation.alpha(0.85).restart();
+            render();
+        }
+
+        function toggleLinkMode() {
+            linkMode = !linkMode;
+            if (!linkMode) {
+                linkingNode = null;
+            }
+            updateLinkModeUI();
+            render();
+        }
+
+        function updateLinkModeUI() {
+            const btn = document.getElementById("btn-link-mode");
+            const hint = document.getElementById("link-mode-hint");
+            const wrap = document.getElementById("canvas-wrapper");
+            if (!btn || !hint || !wrap) return;
+            if (linkMode) {
+                btn.textContent = "连线模式：开";
+                btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-green-600 text-white border-green-600 hover:bg-green-700 shadow-sm";
+                hint.classList.remove("hidden");
+                wrap.classList.add("link-mode-canvas");
+            } else {
+                btn.textContent = "连线模式：关";
+                btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-100";
+                hint.classList.add("hidden");
+                wrap.classList.remove("link-mode-canvas");
+            }
         }
 
         function handleNodeClick(e, d) {
             e.stopPropagation();
-            if (e.shiftKey) {
+            if (linkMode || e.shiftKey) {
                 if (!linkingNode) { linkingNode = d; }
                 else if (linkingNode.id === d.id) { linkingNode = null; }
                 else { createLink(linkingNode, d); linkingNode = null; }
@@ -317,10 +747,15 @@
                 return;
             }
             activeNode = d;
+            activeLink = null;
             linkingNode = null;
+            document.getElementById("link-editor-panel").classList.add("hidden");
             document.getElementById("editor-panel").classList.remove("hidden");
             document.getElementById("node-text").value = d.text;
             document.getElementById("node-radius").value = d.r_override || categoryConfig[d.type].r;
+            document.getElementById("node-font-size").value =
+                (d.fontSize != null && Number.isFinite(d.fontSize)) ? String(clampFontSize(d.fontSize)) : "";
+            document.getElementById("node-stroke").value = d.stroke_override || categoryConfig[d.type].stroke;
             document.getElementById("node-color").value = d.fill_override || categoryConfig[d.type].fill;
             render();
         }
@@ -328,7 +763,17 @@
         function updateActiveNode() {
             if (!activeNode) return;
             activeNode.text = document.getElementById("node-text").value;
-            activeNode.r_override = parseInt(document.getElementById("node-radius").value);
+            const rv = parseInt(document.getElementById("node-radius").value, 10);
+            activeNode.r_override = Number.isFinite(rv) ? rv : undefined;
+            const fontRaw = document.getElementById("node-font-size").value.trim();
+            if (fontRaw === "") {
+                delete activeNode.fontSize;
+            } else {
+                const fv = parseFloat(fontRaw);
+                if (Number.isFinite(fv)) activeNode.fontSize = clampFontSize(fv);
+                else delete activeNode.fontSize;
+            }
+            activeNode.stroke_override = document.getElementById("node-stroke").value;
             activeNode.fill_override = document.getElementById("node-color").value;
             render();
         }
@@ -338,13 +783,18 @@
             delete activeNode.r_override;
             delete activeNode.fill_override;
             delete activeNode.stroke_override;
+            delete activeNode.fontSize;
             document.getElementById("node-radius").value = categoryConfig[activeNode.type].r;
+            document.getElementById("node-font-size").value = "";
+            document.getElementById("node-stroke").value = categoryConfig[activeNode.type].stroke;
             document.getElementById("node-color").value = categoryConfig[activeNode.type].fill;
             render();
         }
 
         function updateCategoryConfig(type, prop, value) {
-            categoryConfig[type][prop] = prop === 'r' ? parseInt(value) : value;
+            if (prop === "r") categoryConfig[type][prop] = parseInt(value, 10);
+            else if (prop === "fontSize") categoryConfig[type][prop] = clampFontSize(value);
+            else categoryConfig[type][prop] = value;
             render();
         }
 
@@ -361,7 +811,8 @@
                 simulation.force("link").strength(numVal);
             } else if (type === 'collide') {
                 simulationParams.collidePadding = numVal;
-                simulation.force("collide").radius(d => (d.r_override || categoryConfig[d.type].r) + numVal);
+                nodes.forEach(computeNodeLayout);
+                simulation.force("collide").radius(d => d.collideR);
             }
             
             simulation.alpha(0.3).restart();
@@ -386,7 +837,15 @@
                 return (s === source.id && t === target.id) || (s === target.id && t === source.id);
             });
             if (exists) { links = links.filter(l => l !== exists); }
-            else { links.push({ source: source, target: target }); }
+            else {
+                links.push({
+                    source: source,
+                    target: target,
+                    stroke: linkDefaults.stroke,
+                    strokeOpacity: linkDefaults.strokeOpacity,
+                    strokeWidth: linkDefaults.strokeWidth
+                });
+            }
             render();
         }
 
@@ -404,7 +863,31 @@
         function dragended(event) { if (!event.active) simulation.alphaTarget(0); event.subject.fx = null; event.subject.fy = null; }
 
         function exportJSON() {
-            const data = { nodes, links: links.map(l => ({ source: typeof l.source === 'object' ? l.source.id : l.source, target: typeof l.target === 'object' ? l.target.id : l.target })), config: categoryConfig };
+            const data = {
+                version: 1,
+                exportTime: new Date().toISOString(),
+                nodes: nodes.map(n => ({
+                    id: n.id,
+                    text: n.text,
+                    type: n.type,
+                    x: n.x,
+                    y: n.y,
+                    r_override: n.r_override,
+                    fill_override: n.fill_override,
+                    stroke_override: n.stroke_override,
+                    fontSize: n.fontSize
+                })),
+                links: links.map(l => ({
+                    source: typeof l.source === "object" ? l.source.id : l.source,
+                    target: typeof l.target === "object" ? l.target.id : l.target,
+                    stroke: l.stroke,
+                    strokeOpacity: l.strokeOpacity,
+                    strokeWidth: l.strokeWidth
+                })),
+                config: JSON.parse(JSON.stringify(categoryConfig)),
+                simulationParams: { ...simulationParams },
+                linkDefaults: { ...linkDefaults }
+            };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -425,12 +908,52 @@
         svg.on("click", (e) => {
             if (e.target.tagName === "svg") {
                 activeNode = null;
+                activeLink = null;
                 linkingNode = null;
+                hoveredNodeId = null;
                 document.getElementById("editor-panel").classList.add("hidden");
+                document.getElementById("link-editor-panel").classList.add("hidden");
                 render();
             }
         });
 
+        document.getElementById("import-json-input").addEventListener("change", function(ev) {
+            const file = ev.target.files && ev.target.files[0];
+            const inputEl = document.getElementById("import-json-input");
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    applyImportedData(data);
+                } catch (err) {
+                    alert("导入失败：无法解析 JSON 文件。");
+                }
+                inputEl.value = "";
+            };
+            reader.readAsText(file, "UTF-8");
+        });
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key !== "Escape") return;
+            linkingNode = null;
+            activeLink = null;
+            hoveredNodeId = null;
+            document.getElementById("link-editor-panel").classList.add("hidden");
+            activeNode = null;
+            document.getElementById("editor-panel").classList.add("hidden");
+            render();
+        });
+
+        window.addEventListener("resize", () => {
+            const c = viewportCenter();
+            simulation.force("center").x(c.x).y(c.y);
+            simulation.force("x").x(c.x);
+            simulation.force("y").y(c.y);
+            simulation.alpha(0.12).restart();
+        });
+
+        syncLinkDefaultInputs();
         render();
     </script>
 </body>
