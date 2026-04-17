@@ -32,7 +32,8 @@
             filter: drop-shadow(0 0 0 2px rgba(245, 158, 11, 0.35));
         }
         @keyframes dash { to { stroke-dashoffset: -8; } }
-        .canvas-container { background-color: #f0fdf4; background-image: radial-gradient(#dcfce7 1px, transparent 1px); background-size: 20px 20px; }
+        /* 默认画布底由主题脚本写入；此处为无 JS 时的回退（官网蓝） */
+        .canvas-container { background-color: #F2F5FA; background-image: radial-gradient(#D3DAEB 1px, transparent 1px); background-size: 20px 20px; }
         .canvas-container.link-mode-canvas { cursor: crosshair; }
         svg { cursor: grab; }
         svg:active { cursor: grabbing; }
@@ -96,7 +97,7 @@
                 <div class="grid grid-cols-2 gap-3 text-xs">
                     <div>
                         <label class="text-gray-500 font-medium block mb-1">颜色</label>
-                        <input type="color" id="link-default-stroke" value="#86efac" oninput="updateLinkDefaults('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
+                        <input type="color" id="link-default-stroke" value="#009DFF" oninput="updateLinkDefaults('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
                     </div>
                     <div>
                         <label class="text-gray-500 font-medium block mb-1">线宽</label>
@@ -105,9 +106,9 @@
                     <div class="col-span-2">
                         <div class="flex justify-between mb-1">
                             <label class="text-gray-500 font-medium">不透明度</label>
-                            <span id="link-default-opacity-val" class="text-green-600 font-mono">0.6</span>
+                            <span id="link-default-opacity-val" class="text-green-600 font-mono">0.55</span>
                         </div>
-                        <input type="range" id="link-default-opacity" min="0.1" max="1" step="0.05" value="0.6" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateLinkDefaults('strokeOpacity', this.value)">
+                        <input type="range" id="link-default-opacity" min="0.1" max="1" step="0.05" value="0.55" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateLinkDefaults('strokeOpacity', this.value)">
                     </div>
                 </div>
             </section>
@@ -175,6 +176,21 @@
                 </div>
             </section>
 
+            <!-- 画布主题（Official Site Style Guide 色彩） -->
+            <section class="mt-4">
+                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2 border-t pt-5 text-sm">
+                    <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+                    画布主题
+                </h3>
+                <p class="text-[11px] text-gray-500 mb-2 leading-relaxed">基于官网样式指南 Token；切换会更新画布底色、点阵与下方类别默认描边/填充、连线默认色。导出 JSON 会记录当前主题 id。</p>
+                <select id="canvas-theme-select" class="w-full border rounded-lg p-2 text-sm border-gray-200 bg-white" title="画布预设主题" onchange="applyCanvasTheme(this.value)">
+                    <option value="brandBlue">官网蓝</option>
+                    <option value="lightBlue">轻蓝区段</option>
+                    <option value="greenGrowth">绿意增长</option>
+                    <option value="purpleFocus">紫调焦点</option>
+                </select>
+            </section>
+
             <!-- 算法参数配置 (布局引擎调节) -->
             <section class="mt-4">
                 <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2 border-t pt-5">
@@ -217,7 +233,7 @@
                         <p class="font-bold text-indigo-900 mb-2">核心目标 (Main)</p>
                         <div class="flex items-center justify-between mb-2">
                             <span>描边</span>
-                            <input type="color" id="cat-main-stroke" value="#1e3a8a" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
+                            <input type="color" id="cat-main-stroke" value="#1D326C" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
                         </div>
                         <div class="flex items-center justify-between mb-2">
                             <span>填充</span>
@@ -236,7 +252,7 @@
                         <p class="font-bold text-green-700 mb-2">功能/策略 (Sub)</p>
                         <div class="flex items-center justify-between mb-2">
                             <span>描边</span>
-                            <input type="color" id="cat-sub-stroke" value="#10b981" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
+                            <input type="color" id="cat-sub-stroke" value="#0080FF" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
                         </div>
                         <div class="flex items-center justify-between mb-2">
                             <span>填充</span>
@@ -266,10 +282,51 @@
     </main>
 
     <script>
-        // 全局类别配置
+        /**
+         * 画布主题（Official Site Style Guide — 与 style-guide 文档对齐）
+         * main/sub：类别默认描边与填充；link：新建连线默认样式；canvas：区段背景 + 点阵色
+         */
+        const CANVAS_THEMES = {
+            brandBlue: {
+                label: "官网蓝",
+                canvasBg: "#F2F5FA",
+                canvasDot: "#D3DAEB",
+                main: { stroke: "#1D326C", fill: "#FFFFFF" },
+                sub: { stroke: "#0080FF", fill: "#FFFFFF" },
+                link: { stroke: "#009DFF", strokeOpacity: 0.55, strokeWidth: 1.5 }
+            },
+            lightBlue: {
+                label: "轻蓝区段",
+                canvasBg: "#E5F4FF",
+                canvasDot: "#B8D4F0",
+                main: { stroke: "#235293", fill: "#FFFFFF" },
+                sub: { stroke: "#0080FF", fill: "#FFFFFF" },
+                link: { stroke: "#009DFF", strokeOpacity: 0.55, strokeWidth: 1.5 }
+            },
+            greenGrowth: {
+                label: "绿意增长",
+                canvasBg: "#EBF3EF",
+                canvasDot: "#C5E0D6",
+                main: { stroke: "#18544F", fill: "#FFFFFF" },
+                sub: { stroke: "#00BA5D", fill: "#FFFFFF" },
+                link: { stroke: "#23CF6D", strokeOpacity: 0.55, strokeWidth: 1.5 }
+            },
+            purpleFocus: {
+                label: "紫调焦点",
+                canvasBg: "#F0EEFF",
+                canvasDot: "#D4CCF0",
+                main: { stroke: "#3A3069", fill: "#FFFFFF" },
+                sub: { stroke: "#2C3852", fill: "#EDF1FA" },
+                link: { stroke: "#7E41FF", strokeOpacity: 0.45, strokeWidth: 1.5 }
+            }
+        };
+
+        let activeThemeId = "brandBlue";
+
+        // 全局类别配置（与 brandBlue 一致；切换主题时由 applyCanvasTheme 更新描边/填充）
         const categoryConfig = {
-            main: { r: 75, stroke: "#1e3a8a", fill: "#ffffff", strokeWidth: 3, fontSize: 12 },
-            sub: { r: 45, stroke: "#10b981", fill: "#ffffff", strokeWidth: 1.5, fontSize: 12 }
+            main: { r: 75, stroke: "#1D326C", fill: "#FFFFFF", strokeWidth: 3, fontSize: 12 },
+            sub: { r: 45, stroke: "#0080FF", fill: "#FFFFFF", strokeWidth: 1.5, fontSize: 12 }
         };
 
         function clampFontSize(px) {
@@ -297,10 +354,10 @@
             collidePadding: 25
         };
 
-        /** 新建连线默认样式（可导出） */
+        /** 新建连线默认样式（可导出；与当前主题同步） */
         let linkDefaults = {
-            stroke: "#86efac",
-            strokeOpacity: 0.6,
+            stroke: "#009DFF",
+            strokeOpacity: 0.55,
             strokeWidth: 1.5
         };
 
@@ -569,6 +626,30 @@
             nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
         }
 
+        function applyCanvasTheme(themeId, opts = {}) {
+            const t = CANVAS_THEMES[themeId];
+            if (!t) return;
+            activeThemeId = themeId;
+            const sel = document.getElementById("canvas-theme-select");
+            if (sel) sel.value = themeId;
+            categoryConfig.main.stroke = t.main.stroke;
+            categoryConfig.main.fill = t.main.fill;
+            categoryConfig.sub.stroke = t.sub.stroke;
+            categoryConfig.sub.fill = t.sub.fill;
+            linkDefaults.stroke = t.link.stroke;
+            linkDefaults.strokeOpacity = t.link.strokeOpacity;
+            linkDefaults.strokeWidth = t.link.strokeWidth;
+            const wrap = document.getElementById("canvas-wrapper");
+            if (wrap) {
+                wrap.style.backgroundColor = t.canvasBg;
+                wrap.style.backgroundImage = `radial-gradient(${t.canvasDot} 1px, transparent 1px)`;
+                wrap.style.backgroundSize = "20px 20px";
+            }
+            syncCategoryInputsFromConfig();
+            syncLinkDefaultInputs();
+            if (!opts.skipRender) render();
+        }
+
         function syncCategoryInputsFromConfig() {
             document.getElementById("cat-main-stroke").value = categoryConfig.main.stroke;
             document.getElementById("cat-main-fill").value = categoryConfig.main.fill;
@@ -650,6 +731,9 @@
             if (!data || !Array.isArray(data.nodes)) {
                 alert("导入失败：文件需包含 nodes 数组。");
                 return;
+            }
+            if (data.themeId && CANVAS_THEMES[data.themeId]) {
+                applyCanvasTheme(data.themeId, { skipRender: true });
             }
             if (data.config) {
                 if (data.config.main) Object.assign(categoryConfig.main, data.config.main);
@@ -886,7 +970,8 @@
                 })),
                 config: JSON.parse(JSON.stringify(categoryConfig)),
                 simulationParams: { ...simulationParams },
-                linkDefaults: { ...linkDefaults }
+                linkDefaults: { ...linkDefaults },
+                themeId: activeThemeId
             };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -953,7 +1038,7 @@
             simulation.alpha(0.12).restart();
         });
 
-        syncLinkDefaultInputs();
+        applyCanvasTheme(activeThemeId, { skipRender: true });
         render();
     </script>
 </body>
