@@ -57,133 +57,114 @@
     </header>
 
     <main class="flex-1 flex overflow-hidden">
-        <aside class="w-80 bg-white border-r overflow-y-auto p-5 flex flex-col gap-6">
-            <!-- 节点添加区 -->
-            <section>
-                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    添加节点类型
-                </h3>
-                <div class="mb-4 p-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/80 space-y-2">
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm font-semibold text-gray-700">连线</span>
-                        <button type="button" id="btn-link-mode" onclick="toggleLinkMode()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-100">
-                            连线模式：关
-                        </button>
-                    </div>
-                    <p id="link-mode-hint" class="text-[11px] text-gray-500 leading-relaxed hidden">
-                        开启后：依次点击起点节点与终点节点即可连线；已存在的连线再次连接会删除。关闭本模式时仍可用 <kbd class="px-1 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-[10px]">Shift</kbd>+点击。
-                    </p>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="addNode('main')" class="p-3 border rounded-xl hover:border-green-400 bg-green-50 flex flex-col items-center gap-2 group transition-all">
-                        <div class="w-10 h-10 rounded-full bg-white border-2 border-indigo-900 group-hover:scale-110 transition-transform"></div>
-                        <span class="text-xs font-medium text-gray-600">核心目标</span>
+        <aside class="w-72 bg-white border-r overflow-y-auto flex flex-col">
+            <div class="divide-y divide-gray-100">
+            <!-- 节点添加 -->
+            <section class="px-4 py-4">
+                <h3 class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.14em] mb-2.5">节点</h3>
+                <div class="grid grid-cols-2 gap-2 mb-2.5">
+                    <button onclick="addNode('main')" class="py-2.5 border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50/40 flex flex-col items-center gap-1.5 group transition-all">
+                        <div class="w-7 h-7 rounded-full bg-white border-2 border-indigo-900 group-hover:scale-110 transition-transform"></div>
+                        <span class="text-[11px] text-gray-600">核心目标</span>
                     </button>
-                    <button onclick="addNode('sub')" class="p-3 border rounded-xl hover:border-green-400 bg-white flex flex-col items-center gap-2 group transition-all shadow-sm">
-                        <div class="w-10 h-10 rounded-lg bg-white border-2 border-green-500 group-hover:scale-110 transition-transform"></div>
-                        <span class="text-xs font-medium text-gray-600">功能/策略</span>
+                    <button onclick="addNode('sub')" class="py-2.5 border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50/40 flex flex-col items-center gap-1.5 group transition-all">
+                        <div class="w-7 h-7 rounded-md bg-white border-2 border-green-500 group-hover:scale-110 transition-transform"></div>
+                        <span class="text-[11px] text-gray-600">功能/策略</span>
                     </button>
                 </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-600">连线模式</span>
+                    <button type="button" id="btn-link-mode" onclick="toggleLinkMode()" class="px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-50">
+                        关
+                    </button>
+                </div>
+                <p id="link-mode-hint" class="text-[11px] text-gray-400 mt-2 leading-relaxed hidden">
+                    依次点击两个节点即可连线；再次连接会删除。<kbd class="px-1 py-0.5 rounded bg-gray-100 text-gray-600 font-mono text-[10px]">Shift</kbd>+点击同样生效。
+                </p>
             </section>
 
-            <!-- 连线样式（默认，新连线使用） -->
-            <section class="p-3 rounded-xl border border-gray-200 bg-white shadow-sm">
-                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2 text-sm">
-                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                    连线默认样式
-                </h3>
-                <p class="text-[11px] text-gray-500 mb-3">新建连线时使用；点击画布上的连线可单独修改。</p>
-                <div class="grid grid-cols-2 gap-3 text-xs">
+            <!-- 连线默认样式 -->
+            <section class="px-4 py-4">
+                <h3 class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.14em] mb-2.5">连线默认样式</h3>
+                <div class="grid grid-cols-2 gap-2.5 text-xs">
                     <div>
-                        <label class="text-gray-500 font-medium block mb-1">颜色</label>
-                        <input type="color" id="link-default-stroke" value="#009DFF" oninput="updateLinkDefaults('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
+                        <label class="text-gray-500 block mb-1">颜色</label>
+                        <input type="color" id="link-default-stroke" value="#009DFF" oninput="updateLinkDefaults('stroke', this.value)" class="h-8 w-full border rounded cursor-pointer border-gray-200">
                     </div>
                     <div>
-                        <label class="text-gray-500 font-medium block mb-1">线宽</label>
-                        <input type="number" id="link-default-width" min="0.5" max="12" step="0.5" value="1.5" oninput="updateLinkDefaults('strokeWidth', this.value)" class="w-full border rounded-lg p-2 border-gray-200">
+                        <label class="text-gray-500 block mb-1">线宽</label>
+                        <input type="number" id="link-default-width" min="0.5" max="12" step="0.5" value="1.5" oninput="updateLinkDefaults('strokeWidth', this.value)" class="w-full h-8 border rounded-md px-2 border-gray-200">
                     </div>
                     <div class="col-span-2">
                         <div class="flex justify-between mb-1">
-                            <label class="text-gray-500 font-medium">不透明度</label>
+                            <label class="text-gray-500">不透明度</label>
                             <span id="link-default-opacity-val" class="text-green-600 font-mono">0.55</span>
                         </div>
-                        <input type="range" id="link-default-opacity" min="0.1" max="1" step="0.05" value="0.55" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateLinkDefaults('strokeOpacity', this.value)">
+                        <input type="range" id="link-default-opacity" min="0.1" max="1" step="0.05" value="0.55" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateLinkDefaults('strokeOpacity', this.value)">
                     </div>
                 </div>
             </section>
 
             <!-- 选中连线编辑 -->
-            <section id="link-editor-panel" class="hidden space-y-3 p-3 rounded-xl border-2 border-amber-200 bg-amber-50/50">
-                <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                    编辑选中连线
-                </h3>
-                <div class="grid grid-cols-2 gap-3 text-xs">
+            <section id="link-editor-panel" class="hidden px-4 py-4 bg-amber-50/40">
+                <h3 class="text-[11px] font-semibold text-amber-700 uppercase tracking-[0.14em] mb-2.5">编辑选中连线</h3>
+                <div class="grid grid-cols-2 gap-2.5 text-xs">
                     <div>
-                        <label class="text-gray-600 font-medium block mb-1">颜色</label>
-                        <input type="color" id="link-edit-stroke" oninput="updateActiveLink('stroke', this.value)" class="h-9 w-full border rounded cursor-pointer border-gray-200">
+                        <label class="text-gray-600 block mb-1">颜色</label>
+                        <input type="color" id="link-edit-stroke" oninput="updateActiveLink('stroke', this.value)" class="h-8 w-full border rounded cursor-pointer border-gray-200">
                     </div>
                     <div>
-                        <label class="text-gray-600 font-medium block mb-1">线宽</label>
-                        <input type="number" id="link-edit-width" min="0.5" max="16" step="0.5" oninput="updateActiveLink('strokeWidth', this.value)" class="w-full border rounded-lg p-2 border-gray-200">
+                        <label class="text-gray-600 block mb-1">线宽</label>
+                        <input type="number" id="link-edit-width" min="0.5" max="16" step="0.5" oninput="updateActiveLink('strokeWidth', this.value)" class="w-full h-8 border rounded-md px-2 border-gray-200">
                     </div>
                     <div class="col-span-2">
                         <div class="flex justify-between mb-1">
-                            <label class="text-gray-600 font-medium">不透明度</label>
+                            <label class="text-gray-600">不透明度</label>
                             <span id="link-edit-opacity-val" class="text-amber-700 font-mono">0.6</span>
                         </div>
-                        <input type="range" id="link-edit-opacity" min="0.1" max="1" step="0.05" oninput="updateActiveLink('strokeOpacity', this.value)" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                        <input type="range" id="link-edit-opacity" min="0.1" max="1" step="0.05" oninput="updateActiveLink('strokeOpacity', this.value)" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-500">
                     </div>
                 </div>
-                <button type="button" onclick="deleteActiveLink()" class="w-full py-2 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-medium hover:bg-red-50">删除此连线</button>
+                <button type="button" onclick="deleteActiveLink()" class="mt-3 w-full py-1.5 bg-white border border-red-200 text-red-600 rounded-md text-xs font-medium hover:bg-red-50">删除此连线</button>
             </section>
 
-            <!-- 选定元素编辑区 -->
-            <section id="editor-panel" class="hidden space-y-4 animate-in fade-in slide-in-from-left-4 duration-200">
-                <h3 class="font-bold text-gray-700 flex items-center gap-2 border-t pt-5">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    编辑选定节点
-                </h3>
-                <div class="space-y-4">
+            <!-- 选中节点编辑 -->
+            <section id="editor-panel" class="hidden px-4 py-4 bg-green-50/30">
+                <h3 class="text-[11px] font-semibold text-green-700 uppercase tracking-[0.14em] mb-2.5">编辑选中节点</h3>
+                <div class="space-y-3">
                     <div>
-                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">文字内容 (空格换行)</label>
-                        <textarea id="node-text" oninput="updateActiveNode()" class="w-full border rounded-lg p-3 text-sm h-20 focus:ring-2 focus:ring-green-200 outline-none transition-all border-gray-200"></textarea>
+                        <label class="text-[11px] text-gray-500 block mb-1">文字内容 <span class="text-gray-400">（空格换行）</span></label>
+                        <textarea id="node-text" oninput="updateActiveNode()" class="w-full border rounded-md p-2 text-xs h-16 focus:ring-2 focus:ring-green-200 outline-none transition-all border-gray-200"></textarea>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-2.5 text-xs">
                         <div>
-                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">自定义半径</label>
-                            <input type="number" id="node-radius" oninput="updateActiveNode()" class="w-full border rounded-lg p-2 text-sm border-gray-200">
+                            <label class="text-[11px] text-gray-500 block mb-1">半径</label>
+                            <input type="number" id="node-radius" oninput="updateActiveNode()" class="w-full h-8 border rounded-md px-2 border-gray-200">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">字号 (px)</label>
-                            <input type="number" id="node-font-size" min="8" max="48" step="1" oninput="updateActiveNode()" class="w-full border rounded-lg p-2 text-sm border-gray-200" title="留空则使用类别默认字号">
+                            <label class="text-[11px] text-gray-500 block mb-1">字号 (px)</label>
+                            <input type="number" id="node-font-size" min="8" max="48" step="1" oninput="updateActiveNode()" class="w-full h-8 border rounded-md px-2 border-gray-200" title="留空则使用类别默认字号">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">描边色</label>
-                            <input type="color" id="node-stroke" oninput="updateActiveNode()" class="w-full h-9 border rounded-lg overflow-hidden cursor-pointer border-gray-200">
+                            <label class="text-[11px] text-gray-500 block mb-1">描边色</label>
+                            <input type="color" id="node-stroke" oninput="updateActiveNode()" class="w-full h-8 border rounded cursor-pointer border-gray-200">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">填充色</label>
-                            <input type="color" id="node-color" oninput="updateActiveNode()" class="w-full h-9 border rounded-lg overflow-hidden cursor-pointer border-gray-200">
+                            <label class="text-[11px] text-gray-500 block mb-1">填充色</label>
+                            <input type="color" id="node-color" oninput="updateActiveNode()" class="w-full h-8 border rounded cursor-pointer border-gray-200">
                         </div>
                     </div>
-                    <p class="text-[11px] text-gray-400">字号留空表示沿用类别默认；描边/填充与类别相同时可在「恢复默认」中清除覆盖。</p>
                     <div class="flex gap-2">
-                        <button onclick="resetNodeStyle()" class="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">恢复默认</button>
-                        <button onclick="deleteActiveElement()" class="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors">删除节点</button>
+                        <button onclick="resetNodeStyle()" class="flex-1 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-50 transition-colors">恢复默认</button>
+                        <button onclick="deleteActiveElement()" class="flex-1 py-1.5 bg-white border border-red-200 text-red-600 rounded-md text-xs font-medium hover:bg-red-50 transition-colors">删除节点</button>
                     </div>
                 </div>
             </section>
 
-            <!-- 画布主题（Official Site Style Guide 色彩） -->
-            <section class="mt-4">
-                <h3 class="font-bold text-gray-700 mb-2 flex items-center gap-2 border-t pt-5 text-sm">
-                    <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
-                    画布主题
-                </h3>
-                <p class="text-[11px] text-gray-500 mb-2 leading-relaxed">基于官网样式指南 Token；切换会更新画布底色、点阵与下方类别默认描边/填充、连线默认色。导出 JSON 会记录当前主题 id。</p>
-                <select id="canvas-theme-select" class="w-full border rounded-lg p-2 text-sm border-gray-200 bg-white" title="画布预设主题" onchange="applyCanvasTheme(this.value)">
+            <!-- 画布主题 -->
+            <section class="px-4 py-4">
+                <h3 class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.14em] mb-2.5">画布主题</h3>
+                <select id="canvas-theme-select" class="w-full h-8 border rounded-md px-2 text-xs border-gray-200 bg-white" onchange="applyCanvasTheme(this.value)">
                     <option value="brandBlue">官网蓝</option>
                     <option value="lightBlue">轻蓝区段</option>
                     <option value="greenGrowth">绿意增长</option>
@@ -191,84 +172,85 @@
                 </select>
             </section>
 
-            <!-- 算法参数配置 (布局引擎调节) -->
-            <section class="mt-4">
-                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2 border-t pt-5">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                    布局引擎调节
-                </h3>
-                <div class="space-y-5 text-sm">
+            <!-- 布局引擎 -->
+            <section class="px-4 py-4">
+                <h3 class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.14em] mb-3">布局引擎</h3>
+                <div class="space-y-3 text-xs">
                     <div>
-                        <div class="flex justify-between mb-1 text-xs">
-                            <label class="text-gray-500 font-medium">离散引力 (间距)</label>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-gray-500">离散引力</label>
                             <span id="val-charge" class="text-green-600 font-mono">-500</span>
                         </div>
-                        <input type="range" id="sim-charge" min="-2000" max="-100" value="-500" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('charge', this.value)">
+                        <input type="range" id="sim-charge" min="-2000" max="-100" value="-500" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('charge', this.value)">
                     </div>
                     <div>
-                        <div class="flex justify-between mb-1 text-xs">
-                            <label class="text-gray-500 font-medium">连线强度 (拉扯)</label>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-gray-500">连线强度</label>
                             <span id="val-link" class="text-green-600 font-mono">0.08</span>
                         </div>
-                        <input type="range" id="sim-link" min="0" max="0.5" step="0.01" value="0.08" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('link', this.value)">
+                        <input type="range" id="sim-link" min="0" max="0.5" step="0.01" value="0.08" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('link', this.value)">
                     </div>
                     <div>
-                        <div class="flex justify-between mb-1 text-xs">
-                            <label class="text-gray-500 font-medium">碰撞半径 (防火墙)</label>
+                        <div class="flex justify-between mb-1">
+                            <label class="text-gray-500">碰撞半径</label>
                             <span id="val-collide" class="text-green-600 font-mono">25</span>
                         </div>
-                        <input type="range" id="sim-collide" min="0" max="100" value="25" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('collide', this.value)">
+                        <input type="range" id="sim-collide" min="0" max="100" value="25" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('collide', this.value)">
                     </div>
                 </div>
             </section>
 
-            <!-- 全局样式定义 -->
-            <section class="mt-4">
-                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2 border-t pt-5">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
-                    类别样式定义
-                </h3>
-                <div class="space-y-4 text-xs">
-                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                        <p class="font-bold text-indigo-900 mb-2">核心目标 (Main)</p>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>描边</span>
-                            <input type="color" id="cat-main-stroke" value="#1D326C" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
-                        </div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>填充</span>
-                            <input type="color" id="cat-main-fill" value="#ffffff" oninput="updateCategoryConfig('main', 'fill', this.value)" class="h-6 w-10">
-                        </div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>基准半径</span>
-                            <input type="number" id="cat-main-r" value="75" oninput="updateCategoryConfig('main', 'r', this.value)" class="w-12 border p-1 rounded">
+            <!-- 类别样式 -->
+            <section class="px-4 py-4">
+                <h3 class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.14em] mb-2.5">类别样式</h3>
+                <div class="space-y-2.5 text-xs">
+                    <div class="rounded-lg border border-gray-100 p-2.5 space-y-1.5">
+                        <p class="font-semibold text-indigo-900 mb-1 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-900"></span>
+                            核心目标
+                        </p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">描边</span>
+                            <input type="color" id="cat-main-stroke" value="#1D326C" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-9 border border-gray-200 rounded cursor-pointer">
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>字号 (px)</span>
-                            <input type="number" id="cat-main-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('main', 'fontSize', this.value)" class="w-12 border p-1 rounded">
+                            <span class="text-gray-500">填充</span>
+                            <input type="color" id="cat-main-fill" value="#ffffff" oninput="updateCategoryConfig('main', 'fill', this.value)" class="h-6 w-9 border border-gray-200 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">半径</span>
+                            <input type="number" id="cat-main-r" value="75" oninput="updateCategoryConfig('main', 'r', this.value)" class="w-14 h-6 border border-gray-200 rounded px-1.5 text-right">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">字号</span>
+                            <input type="number" id="cat-main-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('main', 'fontSize', this.value)" class="w-14 h-6 border border-gray-200 rounded px-1.5 text-right">
                         </div>
                     </div>
-                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                        <p class="font-bold text-green-700 mb-2">功能/策略 (Sub)</p>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>描边</span>
-                            <input type="color" id="cat-sub-stroke" value="#0080FF" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
-                        </div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>填充</span>
-                            <input type="color" id="cat-sub-fill" value="#ffffff" oninput="updateCategoryConfig('sub', 'fill', this.value)" class="h-6 w-10">
-                        </div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span>基准半径</span>
-                            <input type="number" id="cat-sub-r" value="45" oninput="updateCategoryConfig('sub', 'r', this.value)" class="w-12 border p-1 rounded">
+                    <div class="rounded-lg border border-gray-100 p-2.5 space-y-1.5">
+                        <p class="font-semibold text-green-700 mb-1 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-sm bg-green-600"></span>
+                            功能/策略
+                        </p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">描边</span>
+                            <input type="color" id="cat-sub-stroke" value="#0080FF" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-9 border border-gray-200 rounded cursor-pointer">
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>字号 (px)</span>
-                            <input type="number" id="cat-sub-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('sub', 'fontSize', this.value)" class="w-12 border p-1 rounded">
+                            <span class="text-gray-500">填充</span>
+                            <input type="color" id="cat-sub-fill" value="#ffffff" oninput="updateCategoryConfig('sub', 'fill', this.value)" class="h-6 w-9 border border-gray-200 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">半径</span>
+                            <input type="number" id="cat-sub-r" value="45" oninput="updateCategoryConfig('sub', 'r', this.value)" class="w-14 h-6 border border-gray-200 rounded px-1.5 text-right">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500">字号</span>
+                            <input type="number" id="cat-sub-font" min="8" max="48" step="1" value="12" oninput="updateCategoryConfig('sub', 'fontSize', this.value)" class="w-14 h-6 border border-gray-200 rounded px-1.5 text-right">
                         </div>
                     </div>
                 </div>
             </section>
+            </div>
         </aside>
 
         <div class="flex-1 relative canvas-container overflow-hidden" id="canvas-wrapper">
@@ -809,13 +791,13 @@
             const wrap = document.getElementById("canvas-wrapper");
             if (!btn || !hint || !wrap) return;
             if (linkMode) {
-                btn.textContent = "连线模式：开";
-                btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-green-600 text-white border-green-600 hover:bg-green-700 shadow-sm";
+                btn.textContent = "开";
+                btn.className = "px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors bg-green-600 text-white border-green-600 hover:bg-green-700";
                 hint.classList.remove("hidden");
                 wrap.classList.add("link-mode-canvas");
             } else {
-                btn.textContent = "连线模式：关";
-                btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-100";
+                btn.textContent = "关";
+                btn.className = "px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors bg-white text-gray-600 border-gray-200 hover:bg-gray-50";
                 hint.classList.add("hidden");
                 wrap.classList.remove("link-mode-canvas");
             }
