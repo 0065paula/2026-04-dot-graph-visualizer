@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动态关联节点图生成器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .node-active { stroke: #3b82f6 !important; stroke-width: 4px !important; }
+        .node-linking { stroke: #f59e0b !important; stroke-width: 4px !important; stroke-dasharray: 4; animation: dash 1s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: -8; } }
+        .canvas-container { background-color: #f0fdf4; background-image: radial-gradient(#dcfce7 1px, transparent 1px); background-size: 20px 20px; }
+        svg { cursor: grab; }
+        svg:active { cursor: grabbing; }
+        .transition-all { transition: all 0.2s ease; }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-white border-b px-6 py-3 flex justify-between items-center z-10 shadow-sm">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center text-white font-bold">S</div>
+            <h1 class="text-xl font-bold text-gray-800">业务策略架构图</h1>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="exportJSON()" class="px-4 py-2 border rounded hover:bg-gray-50 text-sm">导出数据</button>
+            <button onclick="downloadSVG()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm shadow-sm transition-colors">下载 SVG</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <aside class="w-80 bg-white border-r overflow-y-auto p-5 flex flex-col gap-6">
+            <!-- 节点添加区 -->
+            <section>
+                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    添加节点类型
+                </h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="addNode('main')" class="p-3 border rounded-xl hover:border-green-400 bg-green-50 flex flex-col items-center gap-2 group transition-all">
+                        <div class="w-10 h-10 rounded-full bg-white border-2 border-indigo-900 group-hover:scale-110 transition-transform"></div>
+                        <span class="text-xs font-medium text-gray-600">核心目标</span>
+                    </button>
+                    <button onclick="addNode('sub')" class="p-3 border rounded-xl hover:border-green-400 bg-white flex flex-col items-center gap-2 group transition-all shadow-sm">
+                        <div class="w-10 h-10 rounded-lg bg-white border-2 border-green-500 group-hover:scale-110 transition-transform"></div>
+                        <span class="text-xs font-medium text-gray-600">功能/策略</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 选定元素编辑区 -->
+            <section id="editor-panel" class="hidden space-y-4 animate-in fade-in slide-in-from-left-4 duration-200">
+                <h3 class="font-bold text-gray-700 flex items-center gap-2 border-t pt-5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    编辑选定节点
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">文字内容 (空格换行)</label>
+                        <textarea id="node-text" oninput="updateActiveNode()" class="w-full border rounded-lg p-3 text-sm h-20 focus:ring-2 focus:ring-green-200 outline-none transition-all border-gray-200"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">自定义半径</label>
+                            <input type="number" id="node-radius" oninput="updateActiveNode()" class="w-full border rounded-lg p-2 text-sm border-gray-200">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">自定义填充色</label>
+                            <input type="color" id="node-color" oninput="updateActiveNode()" class="w-full h-9 border rounded-lg overflow-hidden cursor-pointer border-gray-200">
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="resetNodeStyle()" class="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors">恢复默认</button>
+                        <button onclick="deleteActiveElement()" class="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors">删除节点</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 算法参数配置 (布局引擎调节) -->
+            <section class="mt-4">
+                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2 border-t pt-5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    布局引擎调节
+                </h3>
+                <div class="space-y-5 text-sm">
+                    <div>
+                        <div class="flex justify-between mb-1 text-xs">
+                            <label class="text-gray-500 font-medium">离散引力 (间距)</label>
+                            <span id="val-charge" class="text-green-600 font-mono">-500</span>
+                        </div>
+                        <input type="range" min="-2000" max="-100" value="-500" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('charge', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1 text-xs">
+                            <label class="text-gray-500 font-medium">连线强度 (拉扯)</label>
+                            <span id="val-link" class="text-green-600 font-mono">0.08</span>
+                        </div>
+                        <input type="range" min="0" max="0.5" step="0.01" value="0.08" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('link', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1 text-xs">
+                            <label class="text-gray-500 font-medium">碰撞半径 (防火墙)</label>
+                            <span id="val-collide" class="text-green-600 font-mono">25</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="25" class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" oninput="updateSimulationParam('collide', this.value)">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 全局样式定义 -->
+            <section class="mt-4">
+                <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2 border-t pt-5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+                    类别样式定义
+                </h3>
+                <div class="space-y-4 text-xs">
+                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <p class="font-bold text-indigo-900 mb-2">核心目标 (Main)</p>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>主色调</span>
+                            <input type="color" value="#1e3a8a" oninput="updateCategoryConfig('main', 'stroke', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>基准半径</span>
+                            <input type="number" value="75" oninput="updateCategoryConfig('main', 'r', this.value)" class="w-12 border p-1 rounded">
+                        </div>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <p class="font-bold text-green-700 mb-2">功能/策略 (Sub)</p>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>主色调</span>
+                            <input type="color" value="#10b981" oninput="updateCategoryConfig('sub', 'stroke', this.value)" class="h-6 w-10">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>基准半径</span>
+                            <input type="number" value="45" oninput="updateCategoryConfig('sub', 'r', this.value)" class="w-12 border p-1 rounded">
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <div class="flex-1 relative canvas-container overflow-hidden" id="canvas-wrapper">
+            <svg id="main-svg" class="w-full h-full"></svg>
+            <div class="absolute bottom-6 right-6 flex flex-col gap-2 bg-white p-1.5 rounded-xl shadow-xl border border-gray-100">
+                <button onclick="zoomAdjust(1.3)" class="w-10 h-10 hover:bg-gray-50 flex items-center justify-center rounded-lg font-bold text-gray-600 text-xl">+</button>
+                <div class="h-px bg-gray-100 mx-2"></div>
+                <button onclick="zoomAdjust(0.7)" class="w-10 h-10 hover:bg-gray-50 flex items-center justify-center rounded-lg font-bold text-gray-600 text-xl">−</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 全局类别配置
+        const categoryConfig = {
+            main: { r: 75, stroke: "#1e3a8a", fill: "#ffffff", strokeWidth: 3 },
+            sub: { r: 45, stroke: "#10b981", fill: "#ffffff", strokeWidth: 1.5 }
+        };
+
+        // 布局引擎参数
+        let simulationParams = {
+            charge: -500,
+            link: 0.08,
+            collidePadding: 25
+        };
+
+        // 初始数据（按示意图填充）
+        let nodes = [
+            { id: 101, text: "优质客户体验", type: "main" },
+            { id: 102, text: "始终聚焦云计算 坚持产品驱动", type: "main" },
+            { id: 103, text: "真正降本增效 真正达成共赢", type: "main" },
+            { id: 1, text: "数据库支撑", type: "sub" },
+            { id: 2, text: "易于使用", type: "sub" },
+            { id: 3, text: "交付专业快捷", type: "sub", r_override: 55 },
+            { id: 4, text: "生产场景", type: "sub" },
+            { id: 5, text: "稳定可靠", type: "sub" },
+            { id: 6, text: "专注行业应用", type: "sub" },
+            { id: 7, text: "客户可自维护", type: "sub" },
+            { id: 8, text: "模块化产品", type: "sub" },
+            { id: 9, text: "不急功近利", type: "sub" },
+            { id: 10, text: "不参与低价、价值型销售", type: "sub" },
+            { id: 11, text: "满足绝大多数规模客户", type: "sub" },
+            { id: 12, text: "文档、接口全开放 便于客户运维与集成", type: "sub" },
+            { id: 13, text: "国内最接近 对标VMware的全栈产品", type: "sub" },
+            { id: 14, text: "使得公司良性、稳定增长", type: "sub" },
+            { id: 15, text: "定位、解决问题效率高", type: "sub" },
+            { id: 17, text: "V2V、巡检、升级完全可以自主化", type: "sub" },
+            { id: 18, text: "不扔低价内卷", type: "sub" },
+            { id: 19, text: "帮用户避坑", type: "sub" },
+            { id: 21, text: "真正异构集中存储的产品能力", type: "sub" },
+            { id: 22, text: "从场景入手，与客户共成长", type: "sub" }
+        ];
+
+        let links = [
+            { source: 101, target: 1 }, { source: 101, target: 2 }, { source: 101, target: 3 },
+            { source: 101, target: 6 }, { source: 101, target: 7 }, { source: 101, target: 9 },
+            { source: 102, target: 12 }, { source: 102, target: 13 }, { source: 102, target: 15 },
+            { source: 102, target: 17 }, { source: 102, target: 9 },
+            { source: 103, target: 21 }, { source: 103, target: 22 }, { source: 103, target: 10 },
+            { source: 103, target: 18 }, { source: 101, target: 102 }, { source: 102, target: 103 }
+        ];
+
+        let activeNode = null;
+        let linkingNode = null;
+        const svg = d3.select("#main-svg");
+        const container = svg.append("g");
+        const zoom = d3.zoom().scaleExtent([0.1, 5]).on("zoom", (e) => container.attr("transform", e.transform));
+        svg.call(zoom);
+
+        function zoomAdjust(factor) {
+            svg.transition().duration(300).call(zoom.scaleBy, factor);
+        }
+
+        let simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(220).strength(simulationParams.link))
+            .force("charge", d3.forceManyBody().strength(simulationParams.charge))
+            .force("center", d3.forceCenter(window.innerWidth / 2 - 100, window.innerHeight / 2))
+            .force("collide", d3.forceCollide().radius(d => (d.r_override || categoryConfig[d.type].r) + simulationParams.collidePadding))
+            .on("tick", ticked);
+
+        let linkElements = container.append("g").attr("class", "links").selectAll("line");
+        let nodeElements = container.append("g").attr("class", "nodes").selectAll(".node-group");
+
+        function render() {
+            linkElements = linkElements.data(links, d => {
+                const s = typeof d.source === 'object' ? d.source.id : d.source;
+                const t = typeof d.target === 'object' ? d.target.id : d.target;
+                return `${Math.min(s, t)}-${Math.max(s, t)}`;
+            });
+            linkElements.exit().remove();
+            linkElements = linkElements.enter().append("line")
+                .attr("stroke", "#86efac")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", 1.5)
+                .merge(linkElements);
+
+            nodeElements = nodeElements.data(nodes, d => d.id);
+            nodeElements.exit().remove();
+
+            const nodeEnter = nodeElements.enter().append("g")
+                .attr("class", "node-group")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("click", handleNodeClick);
+
+            nodeEnter.append("rect")
+                .attr("class", "node-rect transition-all cursor-pointer shadow-sm");
+
+            nodeEnter.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "middle")
+                .attr("class", "pointer-events-none select-none text-[12px] font-medium");
+
+            nodeElements = nodeEnter.merge(nodeElements);
+
+            nodeElements.each(function(d) {
+                const conf = categoryConfig[d.type];
+                const r = d.r_override || conf.r;
+                const stroke = d.stroke_override || conf.stroke;
+                const fill = d.fill_override || conf.fill;
+                
+                const group = d3.select(this);
+                const rect = group.select("rect");
+                const text = group.select("text");
+
+                const isMain = d.type === 'main';
+                const width = r * 2.2;
+                const height = isMain ? width : r * 1.3;
+                const rx = isMain ? width / 2 : 8;
+
+                rect.attr("width", width)
+                    .attr("height", height)
+                    .attr("x", -width / 2)
+                    .attr("y", -height / 2)
+                    .attr("rx", rx)
+                    .attr("fill", fill)
+                    .attr("stroke", stroke)
+                    .attr("stroke-width", isMain ? 3 : 1.5)
+                    .attr("class", (activeNode && d.id === activeNode.id) ? "node-active" : 
+                                   (linkingNode && d.id === linkingNode.id) ? "node-linking" : "");
+
+                text.attr("fill", stroke);
+
+                text.selectAll("tspan").remove();
+                const lines = d.text.split(" ").flatMap(s => s.match(/.{1,9}/g) || []);
+                lines.forEach((line, i) => {
+                    text.append("tspan")
+                        .attr("x", 0)
+                        .attr("dy", i === 0 ? `-${(lines.length - 1) * 0.6}em` : "1.2em")
+                        .text(line);
+                });
+            });
+
+            simulation.nodes(nodes);
+            simulation.force("link").links(links);
+            simulation.force("collide").radius(d => (d.r_override || categoryConfig[d.type].r) + simulationParams.collidePadding);
+            simulation.alpha(0.1).restart();
+        }
+
+        function ticked() {
+            linkElements.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+        }
+
+        function handleNodeClick(e, d) {
+            e.stopPropagation();
+            if (e.shiftKey) {
+                if (!linkingNode) { linkingNode = d; }
+                else if (linkingNode.id === d.id) { linkingNode = null; }
+                else { createLink(linkingNode, d); linkingNode = null; }
+                render();
+                return;
+            }
+            activeNode = d;
+            linkingNode = null;
+            document.getElementById("editor-panel").classList.remove("hidden");
+            document.getElementById("node-text").value = d.text;
+            document.getElementById("node-radius").value = d.r_override || categoryConfig[d.type].r;
+            document.getElementById("node-color").value = d.fill_override || categoryConfig[d.type].fill;
+            render();
+        }
+
+        function updateActiveNode() {
+            if (!activeNode) return;
+            activeNode.text = document.getElementById("node-text").value;
+            activeNode.r_override = parseInt(document.getElementById("node-radius").value);
+            activeNode.fill_override = document.getElementById("node-color").value;
+            render();
+        }
+
+        function resetNodeStyle() {
+            if (!activeNode) return;
+            delete activeNode.r_override;
+            delete activeNode.fill_override;
+            delete activeNode.stroke_override;
+            document.getElementById("node-radius").value = categoryConfig[activeNode.type].r;
+            document.getElementById("node-color").value = categoryConfig[activeNode.type].fill;
+            render();
+        }
+
+        function updateCategoryConfig(type, prop, value) {
+            categoryConfig[type][prop] = prop === 'r' ? parseInt(value) : value;
+            render();
+        }
+
+        // 核心布局引擎参数更新
+        function updateSimulationParam(type, value) {
+            const numVal = parseFloat(value);
+            document.getElementById(`val-${type}`).innerText = value;
+            
+            if (type === 'charge') {
+                simulationParams.charge = numVal;
+                simulation.force("charge").strength(numVal);
+            } else if (type === 'link') {
+                simulationParams.link = numVal;
+                simulation.force("link").strength(numVal);
+            } else if (type === 'collide') {
+                simulationParams.collidePadding = numVal;
+                simulation.force("collide").radius(d => (d.r_override || categoryConfig[d.type].r) + numVal);
+            }
+            
+            simulation.alpha(0.3).restart();
+        }
+
+        function addNode(type) {
+            const newNode = {
+                id: Date.now(),
+                text: "新条目",
+                type: type,
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2
+            };
+            nodes.push(newNode);
+            render();
+        }
+
+        function createLink(source, target) {
+            const exists = links.find(l => {
+                const s = typeof l.source === 'object' ? l.source.id : l.source;
+                const t = typeof l.target === 'object' ? l.target.id : l.target;
+                return (s === source.id && t === target.id) || (s === target.id && t === source.id);
+            });
+            if (exists) { links = links.filter(l => l !== exists); }
+            else { links.push({ source: source, target: target }); }
+            render();
+        }
+
+        function deleteActiveElement() {
+            if (!activeNode) return;
+            links = links.filter(l => (l.source.id || l.source) !== activeNode.id && (l.target.id || l.target) !== activeNode.id);
+            nodes = nodes.filter(n => n.id !== activeNode.id);
+            activeNode = null;
+            document.getElementById("editor-panel").classList.add("hidden");
+            render();
+        }
+
+        function dragstarted(event) { if (!event.active) simulation.alphaTarget(0.3).restart(); event.subject.fx = event.subject.x; event.subject.fy = event.subject.y; }
+        function dragged(event) { event.subject.fx = event.x; event.subject.fy = event.y; }
+        function dragended(event) { if (!event.active) simulation.alphaTarget(0); event.subject.fx = null; event.subject.fy = null; }
+
+        function exportJSON() {
+            const data = { nodes, links: links.map(l => ({ source: typeof l.source === 'object' ? l.source.id : l.source, target: typeof l.target === 'object' ? l.target.id : l.target })), config: categoryConfig };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = "business_map.json"; a.click();
+        }
+
+        function downloadSVG() {
+            const svgEl = document.getElementById("main-svg").cloneNode(true);
+            const bbox = container.node().getBBox();
+            svgEl.setAttribute("viewBox", `${bbox.x - 50} ${bbox.y - 50} ${bbox.width + 100} ${bbox.height + 100}`);
+            const serializer = new XMLSerializer();
+            const source = '<?xml version="1.0" standalone="no"?>\r\n' + serializer.serializeToString(svgEl);
+            const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+            const a = document.createElement("a");
+            a.href = url; a.download = "strategy_map.svg"; a.click();
+        }
+
+        svg.on("click", (e) => {
+            if (e.target.tagName === "svg") {
+                activeNode = null;
+                linkingNode = null;
+                document.getElementById("editor-panel").classList.add("hidden");
+                render();
+            }
+        });
+
+        render();
+    </script>
+</body>
+</html>
